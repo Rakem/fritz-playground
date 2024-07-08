@@ -35,6 +35,15 @@ fun generateMines(numMines: Int, gridWidth: Int, gridHeight: Int): Map<Pair<Int,
     return newMines
 }
 
+@Lenses
+data class Config(
+    val numMines: Int,
+    val gridWidth: Int,
+    val gridHeight: Int
+) {
+    companion object
+}
+
 
 data class GameState(
     val numMines: Int,

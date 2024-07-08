@@ -26,38 +26,50 @@ class Engine {
 
     fun calculateAdjacency(field: Field, cell: Cell): Int {
         var adjacency = 0
-        if (field[Pair(cell.coordinates.first - 1, cell.coordinates.second)]?.hasMine == true) adjacency += 1
-        if (field[Pair(cell.coordinates.first + 1, cell.coordinates.second)]?.hasMine == true) adjacency += 1
-        if (field[Pair(cell.coordinates.first, cell.coordinates.second - 1)]?.hasMine == true) adjacency += 1
-        if (field[Pair(cell.coordinates.first, cell.coordinates.second + 1)]?.hasMine == true) adjacency += 1
+        for (x in -1..1)
+            for (y in -1..1) {
+                if (field[Pair(
+                        cell.coordinates.first + x,
+                        cell.coordinates.second + y
+                    )]?.hasMine == true
+                ) adjacency += 1
+            }
+
         return adjacency
     }
 
     fun visitCell(field: Field, move: Cell?): Field {
-        println(move)
-        if (move == null || move?.state == CellState.VISITED) return field
+        if (move == null || move.state == CellState.VISITED) return field
         var newField = field.toMap()
         newField[move.coordinates]?.let {
             val adjacents = calculateAdjacency(newField, move)
-            val newState: CellState
-            if (move.hasMine) {
-                newState = CellState.EXPLODED
-            } else {
-                newState = CellState.VISITED
-            }
+            var newState: CellState = move.state
+            if (move.state == CellState.UNVISITED)
+                newState = if (move.hasMine) {
+                    CellState.EXPLODED
+                } else {
+                    CellState.VISITED
+                }
             newField = newField + mapOf(move.coordinates to it.copy(state = newState, adjacents = adjacents))
             if (newState == CellState.VISITED && adjacents == 0) {
-                newField = visitCell(newField, newField[Pair(move.coordinates.first - 1, move.coordinates.second)])
-                newField = visitCell(newField, newField[Pair(move.coordinates.first + 1, move.coordinates.second)])
-                newField = visitCell(newField, newField[Pair(move.coordinates.first, move.coordinates.second - 1)])
-                newField = visitCell(newField, newField[Pair(move.coordinates.first, move.coordinates.second + 1)])
+                for (x in -1..1)
+                    for (y in -1..1) {
+                        newField = visitCell(
+                            newField,
+                            field[Pair(
+                                move.coordinates.first + x,
+                                move.coordinates.second + y
+                            )]
+                        )
+                    }
+
             }
         }
         return newField
     }
 
     fun next(state: GameState, move: Cell): GameState {
-        if (!state.hasEnded() && state.field[move.coordinates]?.state == CellState.UNVISITED) {
+        if (!state.hasEnded()) {
             val newField = visitCell(state.field, move)
             val messages = endingValidator(newField, state)
             return state.copy(field = newField, messages = messages)

@@ -1,16 +1,10 @@
 package app
 
-import dev.fritz2.core.RootStore
-import dev.fritz2.core.lensOf
-import dev.fritz2.core.render
-import dev.fritz2.core.storeOf
+import dev.fritz2.core.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.map
 import logic.Engine
-import model.Cell
-import model.CellState
-import model.Framework
-import model.GameState
+import model.*
 import kotlin.random.Random
 
 class GameStore(private val engine: Engine, initialState: GameState) : RootStore<GameState>(initialState, job = Job()) {
@@ -25,12 +19,30 @@ class GameStore(private val engine: Engine, initialState: GameState) : RootStore
 fun main() {
 
 
-    val numMines = 10
-    val gridWidth = 10
-    val gridHeight = 10
+    val configStore = storeOf(Config(10, 10, 10), job = Job())
+    val numMines = configStore.map(
+        lensOf(
+            "numMines",
+            { it.numMines.toString() },
+            { config, value -> config.copy(numMines = value.toInt()) })
+    )
+    val gridWidth = configStore.map(
+        lensOf(
+            "numMines",
+            { it.gridWidth.toString() },
+            { config, value -> config.copy(gridWidth = value.toInt()) })
+    )
+    val gridHeight = configStore.map(
+        lensOf(
+            "numMines",
+            { it.gridHeight.toString() },
+            { config, value -> config.copy(gridHeight = value.toInt()) })
+    )
 
-    val gameStore = GameStore(Engine(), GameState(numMines, gridWidth, gridHeight))
-
+    val gameStore = GameStore(
+        Engine(),
+        GameState(configStore.current.numMines, configStore.current.gridWidth, configStore.current.gridHeight)
+    )
     render {
         // card
         div("mx-auto sm:px-6 lg:px-8 py-12") {
@@ -40,12 +52,7 @@ fun main() {
                 div("px-6 py-4 text-white bg-sky-700 border-b border-gray-200 font-bold uppercase") {
                     +"Minesweeper"
                 }
-                div("px-6 py-4") {
-                    gameStore.minesLeft.render { minesLeft ->
-                        span { +"Mines left $minesLeft" }
-                    }
 
-                }
                 gameStore.data.render {
                     if (it.hasEnded()) {
                         val message = it.messages.first()
@@ -56,34 +63,60 @@ fun main() {
                         }
                     }
                 }
+                label { +"Mines" }
+                input {
+                    type("number")
+                    value(numMines.data)
+                    changes.values() handledBy numMines.update
+                }
+                label { +"Width" }
+                input {
+                    type("number")
+                    value(gridWidth.data)
+                    changes.values() handledBy gridWidth.update
+                }
+                label { +"Height" }
+                input {
+                    type("number")
+                    value(gridHeight.data)
+                    changes.values() handledBy gridHeight.update
+                }
                 button {
                     +"Reset"
-                    clicks handledBy { gameStore.update(GameState(numMines, gridWidth, gridHeight)) }
+                    clicks handledBy {
+                        gameStore.update(
+                            GameState(
+                                configStore.current.numMines,
+                                configStore.current.gridWidth,
+                                configStore.current.gridHeight
+                            )
+                        )
+                    }
                 }
                 div("flex flex-col  bg-gray-100 p-8") {
                     gameStore.field.render { values ->
-                        for (x in 0..<gridHeight) {
+                        val gridWidth = gameStore.current.gridWidth
+                        val gridHeight = gameStore.current.gridHeight
+                        for (x in 0..<gridWidth) {
                             div("flex flex-row") {
-                                for (y in 0..<gridWidth) {
-                                    var cell = values[Pair(x, y)] ?: continue
+                                for (y in 0..<gridHeight) {
+                                    val cell = values[Pair(x, y)] ?: continue
                                     var color = "bg-white"
                                     if (cell.state == CellState.VISITED) {
-                                        color = "bg-gray-50"
+                                        color = "bg-gray-200"
                                     }
                                     button("w-10 h-10 shadow-sm $color") {
                                         when (cell.state) {
                                             CellState.EXPLODED -> +"x"
                                             CellState.UNVISITED -> +""
                                             CellState.VISITED -> cell.adjacents?.let { if (it > 0) +it.toString() }
-                                            CellState.SAFE -> +"_"
+                                            CellState.SAFE -> +"?"
                                         }
                                         clicks.map { cell.copy() } handledBy gameStore.check
+                                        contextmenus { preventDefault();stopPropagation() }.map { cell.copy(state = if (cell.state == CellState.UNVISITED) CellState.SAFE else CellState.UNVISITED) } handledBy gameStore.check
                                     }
                                 }
                             }
-                        }
-                        values.forEach { cell ->
-
                         }
                     }
                 }
