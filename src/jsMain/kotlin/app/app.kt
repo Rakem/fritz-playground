@@ -2,6 +2,7 @@ package app
 
 import dev.fritz2.core.*
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import logic.Engine
 import model.*
@@ -13,6 +14,9 @@ class GameStore(private val engine: Engine, initialState: GameState) : RootStore
         engine.next(state, move)
     }
     val config = data.map { it.config }
+    fun cell(coords: Pair<Int, Int>): Flow<Cell?> {
+        return data.map { it.field[coords] }
+    }
 }
 
 fun main() {
@@ -91,30 +95,30 @@ fun main() {
                     }
                 }
                 div("flex flex-col  bg-gray-100 p-8") {
-
-                    gameStore.field.render { values ->
-                        val gridWidth = gameStore.current.config.gridWidth
-                        val gridHeight = gameStore.current.config.gridHeight
-                        for (x in 0..<gridWidth) {
+                    gameStore.config.render { config ->
+                        for (x in 0..<config.gridWidth) {
                             div("flex flex-row") {
-                                for (y in 0..<gridHeight) {
-                                    val cell = values[Pair(x, y)] ?: continue
-                                    var color = "bg-white"
-                                    if (cell.state == CellState.VISITED) {
-                                        color = "bg-gray-200"
-                                    }
-                                    button("w-10 h-10 shadow-sm $color") {
-                                        when (cell.state) {
-                                            CellState.EXPLODED -> +"x"
-                                            CellState.UNVISITED -> +""
-                                            CellState.VISITED -> cell.adjacents?.let { if (it > 0) +it.toString() }
-                                            CellState.SAFE -> +"?"
+                                for (y in 0..<config.gridHeight) {
+                                    gameStore.cell(Pair(x, y)).render { cell ->
+                                        if (cell == null) return@render
+                                        var color = "bg-white"
+                                        if (cell.state == CellState.VISITED) {
+                                            color = "bg-gray-200"
                                         }
-                                        clicks.map { cell.copy() } handledBy gameStore.check
-                                        contextmenus { preventDefault();stopPropagation() }.map {
-                                            cell.copy(state = if (cell.state == CellState.UNVISITED) CellState.SAFE else CellState.UNVISITED)
-                                        } handledBy gameStore.check
+                                        button("w-10 h-10 shadow-sm $color") {
+                                            when (cell.state) {
+                                                CellState.EXPLODED -> +"x"
+                                                CellState.UNVISITED -> +""
+                                                CellState.VISITED -> cell.adjacents?.let { if (it > 0) +it.toString() }
+                                                CellState.SAFE -> +"?"
+                                            }
+                                            clicks.map { cell.copy() } handledBy gameStore.check
+                                            contextmenus { preventDefault();stopPropagation() }.map {
+                                                cell.copy(state = if (cell.state == CellState.UNVISITED) CellState.SAFE else CellState.UNVISITED)
+                                            } handledBy gameStore.check
+                                        }
                                     }
+
                                 }
                             }
                         }
