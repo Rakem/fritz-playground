@@ -12,9 +12,16 @@ class GameEndMessage(override val path: String, val text: String, val type: Stri
     override val isError: Boolean = false
 }
 
+val neighbourhood =
+    arrayOf(
+        Pair(-1, -1), Pair(-1, 0), Pair(-1, 1),
+        Pair(0, -1), /*exclude origin, */ Pair(0, 1),
+        Pair(1, -1), Pair(1, 0), Pair(1, 1)
+    )
+
 class Engine {
     companion object {
-        private val endingValidator: Validation<Field, GameState, GameEndMessage> = validation { inspector, gameState ->
+        private val endingValidator: Validation<Field, GameState, GameEndMessage> = validation { inspector, _ ->
             if (inspector.data.any { it.value.state == CellState.EXPLODED }) {
                 add(GameEndMessage(inspector.path, "You have exploded!", "alert-info"))
             } else if (GameState.isFull(inspector.data)) {
@@ -24,47 +31,37 @@ class Engine {
 
     }
 
-    fun calculateAdjacency(field: Field, cell: Cell): Int {
-        var adjacency = 0
-        for (x in -1..1)
-            for (y in -1..1) {
-                if (field[Pair(
-                        cell.coordinates.first + x,
-                        cell.coordinates.second + y
-                    )]?.hasMine == true
-                ) adjacency += 1
-            }
-
-        return adjacency
+    private fun getNeighbors(field: Field, cell: Cell): List<Cell> {
+        return neighbourhood.mapNotNull {
+            field[Pair(
+                cell.coordinates.first + it.first,
+                cell.coordinates.second + it.second
+            )]
+        }
     }
 
-    fun visitCell(field: Field, move: Cell?): Field {
-        if (move == null || move.state == CellState.VISITED) return field
-        var newField = field.toMap()
-        newField[move.coordinates]?.let {
-            val adjacents = calculateAdjacency(newField, move)
-            var newState: CellState = move.state
-            if (move.state == CellState.UNVISITED)
-                newState = if (move.hasMine) {
-                    CellState.EXPLODED
-                } else {
-                    CellState.VISITED
-                }
-            newField = newField + mapOf(move.coordinates to it.copy(state = newState, adjacents = adjacents))
-            if (newState == CellState.VISITED && adjacents == 0) {
-                for (x in -1..1)
-                    for (y in -1..1) {
-                        newField = visitCell(
-                            newField,
-                            field[Pair(
-                                move.coordinates.first + x,
-                                move.coordinates.second + y
-                            )]
-                        )
-                    }
+    private fun calculateAdjacency(field: Field, cell: Cell): Int {
+        return getNeighbors(field, cell).sumOf { if (it.hasMine) 1 else 0 as Int }
+    }
 
+
+    private fun visitCell(field: Field, move: Cell?): Field {
+        if (move == null || move.state == CellState.VISITED) return field
+
+
+        val adjacents = calculateAdjacency(field, move)
+        var newState: CellState = move.state
+        if (move.state == CellState.UNVISITED)
+            newState = if (move.hasMine) {
+                CellState.EXPLODED
+            } else {
+                CellState.VISITED
             }
+        var newField = field + mapOf(move.coordinates to move.copy(state = newState, adjacents = adjacents))
+        if (newState == CellState.VISITED && adjacents == 0) {
+            newField = getNeighbors(field, move).fold(newField) { f, neighbor -> visitCell(f, neighbor) }
         }
+
         return newField
     }
 

@@ -5,7 +5,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.map
 import logic.Engine
 import model.*
-import kotlin.random.Random
 
 class GameStore(private val engine: Engine, initialState: GameState) : RootStore<GameState>(initialState, job = Job()) {
 
@@ -13,7 +12,7 @@ class GameStore(private val engine: Engine, initialState: GameState) : RootStore
     val check = handle<Cell> { state, move ->
         engine.next(state, move)
     }
-    val minesLeft = data.map { it.minesLeft() }
+    val config = data.map { it.config }
 }
 
 fun main() {
@@ -41,7 +40,7 @@ fun main() {
 
     val gameStore = GameStore(
         Engine(),
-        GameState(configStore.current.numMines, configStore.current.gridWidth, configStore.current.gridHeight)
+        GameState(configStore.current)
     )
     render {
         // card
@@ -86,17 +85,16 @@ fun main() {
                     clicks handledBy {
                         gameStore.update(
                             GameState(
-                                configStore.current.numMines,
-                                configStore.current.gridWidth,
-                                configStore.current.gridHeight
+                                configStore.current
                             )
                         )
                     }
                 }
                 div("flex flex-col  bg-gray-100 p-8") {
+
                     gameStore.field.render { values ->
-                        val gridWidth = gameStore.current.gridWidth
-                        val gridHeight = gameStore.current.gridHeight
+                        val gridWidth = gameStore.current.config.gridWidth
+                        val gridHeight = gameStore.current.config.gridHeight
                         for (x in 0..<gridWidth) {
                             div("flex flex-row") {
                                 for (y in 0..<gridHeight) {
@@ -113,7 +111,9 @@ fun main() {
                                             CellState.SAFE -> +"?"
                                         }
                                         clicks.map { cell.copy() } handledBy gameStore.check
-                                        contextmenus { preventDefault();stopPropagation() }.map { cell.copy(state = if (cell.state == CellState.UNVISITED) CellState.SAFE else CellState.UNVISITED) } handledBy gameStore.check
+                                        contextmenus { preventDefault();stopPropagation() }.map {
+                                            cell.copy(state = if (cell.state == CellState.UNVISITED) CellState.SAFE else CellState.UNVISITED)
+                                        } handledBy gameStore.check
                                     }
                                 }
                             }
@@ -124,5 +124,3 @@ fun main() {
         }
     }
 }
-
-typealias MineStore = Map<Pair<Int, Int>, Boolean>

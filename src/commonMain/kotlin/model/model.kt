@@ -46,13 +46,11 @@ data class Config(
 
 
 data class GameState(
-    val numMines: Int,
-    val gridWidth: Int,
-    val gridHeight: Int,
+    val config: Config,
     val field: Field = buildMap {
-        val mines = generateMines(numMines, gridWidth, gridHeight)
-        (0..<gridWidth).map { x ->
-            (0..<gridHeight).map { y ->
+        val mines = generateMines(config.numMines, config.gridWidth, config.gridHeight)
+        (0..<config.gridWidth).map { x ->
+            (0..<config.gridHeight).map { y ->
                 val coords = Pair(x, y)
                 put(
                     coords,
